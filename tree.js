@@ -854,6 +854,151 @@ define(["text!./tree.css", "./Cookies.js"], function (treecss, Cookies) {
         };
       };
 
+      var Subsets = function (config) {
+        var _state = {
+          element: null,
+          hidden: true
+        };
+        var _config = {
+          root: config.root
+        };
+
+        var _removeActiveFromSubsets = function () {
+          var subsets = $scope.state.get("subsets");
+          var values = subsets.values();
+          var value = values.next();
+          document.querySelectorAll(".subset-title").innerHTML = "";
+          while (value.value) {
+            value.value.removeActive();
+            value = values.next();
+          }
+        };
+
+        var Subset = function (name, root) {
+          var self = this;
+          this.name = name;
+          var _state = {
+            root: root,
+            template: null,
+            elements: []
+          };
+
+          var _template = function () {
+            var template = document.createElement("div");
+            template.classList.add("subset-label");
+            template.innerHTML = self.name;
+
+            template.addEventListener("click", self.active);
+
+            return template;
+          };
+
+          var _getSubset = function () {
+            var request = new AsyncWrapper(server);
+            request.get().endpoint(`Dimensions('${dimension}')/Hierarchies('${dimension}')/Subsets('${this.name}')?$expand=Elements`);
+            request.send()
+              .then(function (results) {
+                var rootElements = [];
+                results = JSON.parse(results);
+                console.log(results);
+                for (var i = 0; i < results.Elements.length; i++) {
+                  var element = results.Elements[i];
+                  var name = (element.Attributes.Caption) ? element.Attributes.Caption : element.Name;
+                  rootElements.push({ name: name, id: name, parents: null });
+                }
+                _state.elements = rootElements;
+                return rootElements;
+              });
+          };
+
+          var _drawTree = function () {
+            $scope.state.get("current-tree").clear();
+            var _config = Object.assign({}, config);
+            _config.name = self.name;
+            _config.definedRoots = (_state.elements.length == 0) ? _getSubset : _state.elements;
+
+            new Tree(_config);
+          };
+
+          this.active = function () {
+            _removeActiveFromSubsets();
+            _state.template.classList.add("subset-active");
+            document.querySelector(".subset-title").innerHTML = self.name;
+            _drawTree();
+          };
+
+          this.removeActive = function () {
+            _state.template.classList.remove("subset-active");
+          };
+
+          !function onInit() {
+            _state.template = _template();
+            _state.root.appendChild(_state.template);
+          }();
+
+          return {
+            name: this.name,
+            active: this.active,
+            removeActive: this.removeActive
+          };
+        };
+        var _getSubsets = function (dropdown) {
+
+          var request = new AsyncWrapper(server);
+          request.get().endpoint(`Dimensions('${dimension}')/Hierarchies('${dimension}')/Subsets`)
+            .send()
+            .then(function (subsets) {
+              var allSubsets = $scope.state.get("subsets");
+              subsets = JSON.parse(subsets);
+              var rootSubset = new Subset("Subset All", dropdown);
+              allSubsets.set(rootSubset.name, rootSubset);
+              for (var i = 0; i < subsets.value.length; i++) {
+                var subset = new Subset(subsets.value[i].Name, dropdown);
+                allSubsets.set(subsets.value[i].Name, subset);
+              }
+            })
+            .then(function () { console.log($scope.state.get("subsets")); });
+        };
+        var _template = function () {
+          var template = document.createElement("div");
+          template.id = "subsets";
+          template.innerHTML = "<div class=\"subset-title\"></div><div class=\"subset-btn\"><i class=\"align-right fas fa-sort-down\"></i></div>";
+          return template;
+        };
+        var _dropdownContainer = function () {
+          var template = document.createElement("div");
+          template.classList.add("subset-container");
+          template.classList.add("hide");
+
+          return template;
+        };
+
+        !function onInit() {
+          $scope.state.set("subsets", new Map());
+          var subsets = _template();
+          var dropdown = _dropdownContainer();
+          _state.element = subsets;
+          _config.root.insertAdjacentElement("afterbegin", subsets);
+          _state.element.insertAdjacentElement("afterend", dropdown);
+          _getSubsets(dropdown);
+
+          subsets.addEventListener("click", function (e) {
+            e.stopPropagation();
+            if (_state.hidden) dropdown.classList.remove("hide");
+            else dropdown.classList.add("hide");
+            _state.hidden = !_state.hidden;
+            console.log(_state.hidden);
+          });
+
+          document.addEventListener("click", function () {
+            dropdown.classList.add("hide");
+            _state.hidden = true;
+          });
+
+
+        }();
+      };
+
       var SearchScrollIterator = function (root, scrollComponent) {
         var self = this;
         this.state = {

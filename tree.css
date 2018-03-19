@@ -5,9 +5,9 @@
 }
 
 #scroller {
+  display: inline-block;
   font-size: .75em;
   text-align: right;
-  position: absolute;
   top: 5px;
   right: 5px;
 }
@@ -16,7 +16,23 @@
   display: inline-block;
 }
 
+#tree {
+  display: block;
+}
+
+#subsets {
+  border: .5px solid #e3e3e3;
+  background: white;
+  border-radius: 3px;
+  line-height: 1.10;
+  padding: 5px;
+  width: calc(var(--width) - 25px);
+  overflow: hidden;
+  margin-bottom: 5px;
+}
+
 #selection {
+  display: inline-block;
   font-size: var(--font-size);
   color: #333;
   padding: 5px 8px 8px;
@@ -29,7 +45,7 @@
   height: var(--height);
   overflow-y: auto;
   display: inline-block;
-  margin: 35px 0 .25em 10px;
+  margin: 35px 0 10px;
   box-shadow: inset 0 0 2px #999;
 }
 
@@ -40,14 +56,10 @@
 .deselect-btn {
   display: inline-block;
   margin-right: 5px;
-  line-height: 1.25;
-  background: #ff4d4d;
+  font-size: 10px;
   cursor: pointer;
-  padding: 5px;
-}
-
-.deselect-btn:hover {
-  background: #ff8282;
+  margin-top: -5px;
+  color: #387bd8;
 }
 
 .select-btn {
@@ -82,10 +94,12 @@
 
 #main {
   display: inline-block;
+  position: relative;
 }
 
 #search {
   display: inline-block;
+  position: relative;
   font-size: 1em;
   height: 25px;
   border-top-right-radius: 1px;
@@ -117,6 +131,7 @@
 .scroll-arrow {
   margin: 0 5px;
   cursor: pointer;
+  font-size: 1.5em;
 }
 
 .minus {
@@ -300,4 +315,42 @@ input {
 
 .minus .svg-inline--fa {
   vertical-align: calc(100%/-8);
+}
+
+.subset-label {
+  cursor: pointer;
+}
+
+.subset-label:hover {
+  background-color: #e0efff;
+}
+
+
+.subset-btn {
+  display: inline-block;
+  float: right;
+  font-size: 1.25em;
+}
+
+.subset-container {
+  line-height: 1.25;
+  padding: 5px;
+  margin-bottom: 10px;
+  box-shadow: 1px 1px 1px #b9b9b9;
+  border: .5px solid #e3e3e3;
+  width: calc(var(--width) - 25px);
+  height: 200px;
+  overflow: auto;
+}
+
+.subset-active {
+  background: #387bd8;
+}
+
+.subset-container:focus {
+  display: block;
+}
+
+.subset-title {
+  display: inline-block;
 }

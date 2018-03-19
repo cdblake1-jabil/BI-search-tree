@@ -1,10 +1,10 @@
-var ENVIRONMENT = "PROD";
+var ENVIRONMENT = "DEV";
 var data = [];
 var roots = [];
 var dimension = "Profit Center";
-var server = "https://training.myanalytics.jabil.com/api/v1/";
+// var server = "https://training.myanalytics.jabil.com/api/v1/";
 // var server = "http://corrdcctmdev10.corp.jabil.org:8000/api/v1/";
-// var server = "http://CORRDCCTMSTG10.corp.jabil.org:8000/api/v1/";
+var server = "http://CORRDCCTMSTG10.corp.jabil.org:8000/api/v1/";
 
 (function (k) { if ("function" === typeof define && define.amd) define(k); else if ("object" === typeof exports) module.exports = k(); else { var g = window.Cookies, c = window.Cookies = k(); c.noConflict = function () { window.Cookies = g; return c; }; } })(function () {
   function k() { for (var c = 0, b = {}; c < arguments.length; c++) { var a = arguments[c], f; for (f in a) b[f] = a[f]; } return b; } function g(c) {
@@ -346,8 +346,8 @@ var AsyncWrapper = function (url) {
       // }
 
       var passport = Cookies.get("cam_passport");
-      request.setRequestHeader("Authorization", "CAMPassport " + passport);
-      // request.setRequestHeader("Authorization", "CAMNamespace MTAwMDMyNjI3OjdETGNnY2IxMjMhITpKYWJpbF9BRA==");
+      // request.setRequestHeader("Authorization", "CAMPassport " + passport);
+      request.setRequestHeader("Authorization", "CAMNamespace MTAwMDMyNjI3OjdETGNnY2IxMjMhITpKYWJpbF9BRA==");
       request.setRequestHeader("Content-Type", "application/json; charset=utf-8");
       request.onreadystatechange = function () {
         if (config.onStateChange) config.onStateChange();
@@ -438,7 +438,6 @@ var FragmentHandler = (function (_fragments) {
 })($scope.state.get("fragments"));
 var JbTree = (function () {
   var $jbTree = this;
-
   var Utilities = (function () {
     var Nodes = {
       get: function (id) { return $scope.state.get("current-nodes").get(id); },
@@ -457,7 +456,6 @@ var JbTree = (function () {
     };
 
   })();
-
   var Tree = function (config) {
     var self = this;
     var _config = {
@@ -472,12 +470,6 @@ var JbTree = (function () {
     var _drawElementRoot = function (root) {
       var element = document.createElement("div");
       element.classList.add("tree");
-
-      root.appendChild(element);
-    };
-    var _drawSearchRoot = function (root) {
-      var element = document.createElement("div");
-      element.classList.add("search");
 
       root.appendChild(element);
     };
@@ -502,7 +494,7 @@ var JbTree = (function () {
         else {
           $scope.state.set("current-nodes", nodes);
           _drawRoots(root, config.name);
-          $scope.state.set("NodesLoaded", true);
+          $scope.state.set("nodes-loaded", true);
         }
       }
       doChunk();
@@ -512,28 +504,34 @@ var JbTree = (function () {
       $scope.state.set(`${name}:roots`, []);
       for (let i = 0; i < _config.definedRoots.length; i++) {
         var definedNode = _config.definedRoots[i];
-        var node = (_hasNode(definedNode)) ? Utilities.nodes.get(definedNode.id) 
-        : new Node(definedNode.name, definedNode.id, definedNode.parents, definedNode.level);
-        console.log(root);
+        var node = (_hasNode(definedNode.id)) ? Utilities.nodes.get(definedNode.id) 
+        : new Node(definedNode.name, definedNode.id, definedNode.parents, definedNode.level, config);
         node.draw(root);
         $scope.state.get(`${name}:roots`).push(node);
       }
     };
-
     var _hasNode = function(id) {
-      return Utilities.nodes.has(_config.definedRoots[i].id);
+      return Utilities.nodes.has(id);
     }
-
+    this.clear = function() {
+      _config.root.innerHTML = "";
+    }
     !function onInit() {
-      $scope.state.set("NodesLoaded", false);
-      _drawSearchRoot(_config.root);
+      $scope.state.set("nodes-loaded", false);
       _drawElementRoot(_config.root);
       _defineFragment(_config.name, _config.root, true);
+      
+      $scope.state.set("current-tree", self);
+      FragmentHandler.get(config.name).transferChild($scope.state.get("main-root"), "afterbegin");
 
       var nodes = _defineNodes(_config.data, config);
       $scope.state.set("current-nodes", nodes);
 
     }();
+
+    return {
+      clear: this.clear
+    }
   };
   var Node = function (name, id, parents, level, config) {
     var self = this;
@@ -544,10 +542,6 @@ var JbTree = (function () {
       level: level
     };
     var _config = {
-      onSelect: config.onSelect,
-      onDeselect: config.onDeselect,
-      onOpen: config.onOpen,
-      onClose: config.onClose,
       data: config.data,
       root: config.root,
       treeFragment: config.treeFragment
@@ -731,7 +725,172 @@ var JbTree = (function () {
       draw: this.draw
     };
   };
+  var Subsets = function (config) {
+    var _state = {
+      element: null,
+      hidden: true
+    };
+    var _config = {
+      root: config.root
+    };
 
+    var _removeActiveFromSubsets = function () {
+      var subsets = $scope.state.get("subsets");
+      var values = subsets.values();
+      var value = values.next();
+      document.querySelectorAll(".subset-title").innerHTML = "";
+      if(!value) return;
+      while (value.value) {
+        value.value.removeActive();
+        value = values.next();
+      }
+    };
+    var Subset = function (name, root) {
+      var self = this;
+      this.name = name;
+      var _state = {
+        root: root,
+        template: null,
+        elements: []
+      };
+
+      var _template = function () {
+        var template = document.createElement("div");
+        template.classList.add("subset-label");
+        template.innerHTML = self.name;
+
+        template.addEventListener("click", self.active);
+
+        return template;
+      };
+
+      var _getSubset = function () {
+        var request = new AsyncWrapper(server);
+        request.get().endpoint(`Dimensions('${dimension}')/Hierarchies('${dimension}')/Subsets('${self.name}')?$expand=Elements`);
+        return request.send()
+          .then(function (results) {
+            var rootElements = [];
+            results = JSON.parse(results);
+            console.log(results);
+            for (var i = 0; i < results.Elements.length; i++) {
+              var element = results.Elements[i];
+              var name = (element.Attributes.Caption) ? element.Attributes.Caption : element.Name;
+              rootElements.push({ name: name, id: name, parents: null });
+            }
+            return rootElements;
+          });
+      };
+
+      var _drawTree = function () {
+        
+        if($scope.state.get("current-tree")) { draw() } 
+        else { 
+          console.log("not ready");
+          setTimeout(_drawTree, 500) 
+        } 
+
+        function draw() {
+          var _config = Object.assign({}, config);
+          _config.name = self.name;
+          _config.root = document.getElementById("root");
+
+          if(_state.elements.length == 0) {
+            _getSubset().then(function(results){
+              _config.definedRoots = results;
+              $scope.state.get("current-tree").clear();
+              new Tree(_config);
+            })
+          }
+        }
+      };
+
+      this.active = function () {
+        self.setTitle();
+        _drawTree();
+      };
+
+      this.setTitle = function() {
+        _removeActiveFromSubsets();
+        _state.template.classList.add("subset-active");
+        document.querySelector(".subset-title").innerHTML = self.name;
+      }
+
+      this.removeActive = function () {
+        _state.template.classList.remove("subset-active");
+      };
+
+      !function onInit() {
+        _state.template = _template();
+        _state.root.appendChild(_state.template);
+      }();
+
+      return {
+        name: this.name,
+        active: this.active,
+        removeActive: this.removeActive,
+        setTitle: this.setTitle
+      };
+    };
+
+    var _getSubsets = function (dropdown) {
+
+      var request = new AsyncWrapper(server);
+      $scope.state.set("subsets-loaded", false);
+      request.get().endpoint(`Dimensions('${dimension}')/Hierarchies('${dimension}')/Subsets`)
+        .send()
+        .then(function (subsets) {
+          var allSubsets = $scope.state.get("subsets");
+          subsets = JSON.parse(subsets);
+          var rootSubset = new Subset("Subset All", dropdown);
+          allSubsets.set(rootSubset.name, rootSubset);
+          for (var i = 0; i < subsets.value.length; i++) {
+            var subset = new Subset(subsets.value[i].Name, dropdown);
+            allSubsets.set(subsets.value[i].Name, subset);
+          }
+        })
+        .then(function () { 
+          $scope.state.set("subsets-loaded", true);
+          console.log($scope.state.get("subsets")); 
+        });
+    };
+    var _template = function () {
+      var template = document.createElement("div");
+      template.id = "subsets";
+      template.innerHTML = "<div class=\"subset-title\"></div><div class=\"subset-btn\"><i class=\"align-right fas fa-sort-down\"></i></div>";
+      return template;
+    };
+    var _dropdownContainer = function () {
+      var template = document.createElement("div");
+      template.classList.add("subset-container");
+      template.classList.add("hide");
+
+      return template;
+    };
+
+    !function onInit() {
+      $scope.state.set("subsets", new Map());
+      var subsets = _template();
+      var dropdown = _dropdownContainer();
+      _state.element = subsets;
+      _config.root.insertAdjacentElement("afterbegin", subsets);
+      _state.element.insertAdjacentElement("afterend", dropdown);
+      _getSubsets(dropdown);
+
+      subsets.addEventListener("click", function (e) {
+        e.stopPropagation();
+        if (_state.hidden) dropdown.classList.remove("hide");
+        else dropdown.classList.add("hide");
+        _state.hidden = !_state.hidden;
+        console.log(_state.hidden);
+      });
+
+      document.addEventListener("click", function () {
+        dropdown.classList.add("hide");
+        _state.hidden = true;
+      });
+
+    }();
+  };
   var Search = function (config) {
     var self = this;
     var _config = {
@@ -789,7 +948,7 @@ var JbTree = (function () {
           _closeRoots();
           scroller.reset();
           if (!_validTerm(term)) return;
-          if ($scope.state.get("NodesLoaded")) {
+          if ($scope.state.get("nodes-loaded")) {
             var results = _searchResults(Utilities.nodes.all(), term);
             for (let i = 0; i < results.length; i++) {
               var parents = _getParents(results[i]);
@@ -847,9 +1006,8 @@ var JbTree = (function () {
     };
 
     !function init() {
-      var search = document.getElementById("search");
-      search = (search) ? search : _drawInput(_config.root);
-
+     
+      _drawInput(_config.root);
       var container = _drawSearchContainer(_config.root);
       var button = _config.root.querySelector(".submit");
 
@@ -872,7 +1030,6 @@ var JbTree = (function () {
       init: this.init
     };
   };
-
   var SearchScrollIterator = function (root, scrollComponent) {
     var self = this;
     this.state = {
@@ -927,11 +1084,11 @@ var JbTree = (function () {
       template.innerHTML = `
           <div class="scroll-selection-name"></div>
           <div class ="scroll-selector left-scroll">
-            <i class="fas fa-arrow-left scroll-arrow"></i>
+            <i class="fas fa-angle-down scroll-arrow"></i>
           </div>
           <span id="counter"></span>
           <div class="scroll-selector right-scroll">
-          <i class="fas fa-arrow-right scroll-arrow"></i>
+          <i class="fas fa-angle-up scroll-arrow"></i>
           </div>
         `;
       _components.counter = template.querySelector("#counter");
@@ -947,7 +1104,6 @@ var JbTree = (function () {
       back: _scrollBack
     };
   };
-
   var Selection = function (config) {
     var self = this;
     self.state = {
@@ -1185,47 +1341,63 @@ var JbTree = (function () {
       addSelection: this.addSelection
     };
   };
-
   this.state = new State();
-
-  this.init = function (config, root) {
-    var rootParent = config.root.parentNode;
-    var tree = new Tree(config);
+  this.init = function (config) {
+    $scope.state.set("main-root", config.root);
+    
     var loading = Loading("current-load");
-    this.state.set("current-tree", tree);
+    var treeRoot = document.createElement("div");
+    treeRoot.id = "tree";
+    var searchRoot = document.createElement("div");
+    searchRoot.id = "search";
+    var selectRoot = document.createElement("div");
+    selectRoot.id = "select";
+    var subsetRoot = document.createElement("div");
+    subsetRoot.id = "subset";
 
-    var searchConfig = Object.assign({}, config);
-    searchConfig.treeFragment = FragmentHandler.get(config.name);
-    searchConfig.root = searchConfig.treeFragment.child.querySelector(".search");
+    config.root.insertAdjacentElement("afterbegin", treeRoot);
+    var treeConfig = Object.assign({}, config);
+    treeConfig.root = treeRoot;
+    var tree = new Tree(treeConfig);
 
-    new Promise(function (resolve) {
-      loading.transferChild(root, "beforeend");
-      resolve();
-    })
-      .then(function () {
-        FragmentHandler.get(config.name).transferChild(root, "beforeend");
+    nodesAreLoading();
 
-      })
-      .then(function () {
-        loading.pushChild();
+    function nodesAreLoading() {
+      if($scope.state.get("nodes-loaded")) {
+        loading.pushChild() 
+
+        config.root.insertAdjacentElement("afterbegin", searchRoot);
+        var searchConfig = Object.assign({}, config);
+        searchConfig.treeFragment = FragmentHandler.get(config.name);
+        searchConfig.root = searchRoot;
         new Search(searchConfig);
+
         var scroller = new SearchScrollIterator(
-          searchConfig.treeFragment.child.querySelector(".search"),
-          config.root.querySelector(".tree")
+          searchRoot,
+          treeRoot
         );
-
         $scope.state.set("scroller", scroller);
-      })
-      .then(function () {
+
+        config.root.insertAdjacentElement("beforeend", selectRoot);
         var selectionConfig = Object.assign({}, config);
-        selectionConfig.root = rootParent;
+        selectionConfig.root = selectRoot;
         new Selection(selectionConfig);
-      });
 
-
-
+        config.root.insertAdjacentElement("afterbegin", subsetRoot);
+        var subsetsConfig = Object.assign({}, config);
+        subsetsConfig.root = subsetRoot;
+        new Subsets(subsetsConfig);
+        subsetsLoaded();
+      }  else { 
+        loading.transferChild(rootParent, "afterbegin");
+        setTimeout(nodesAreLoading, 500)
+      }
+    };
+    function subsetsLoaded() {
+      if($scope.state.get("subsets-loaded")) { $scope.state.get("subsets").get("Subset All").setTitle()}
+      else {setTimeout(subsetsLoaded, 500)}
+    };
   };
-
   return {
     init: this.init,
     state: this.state
@@ -1236,9 +1408,8 @@ var JbTree = (function () {
 
 function start() {
   JbTree.init({
-    data: data, root: document.getElementById("root"), searchMethod: "inlineSearch",
-    subsets: true, definedRoots: roots, name: "root-tree"
-  }, document.getElementById("main"));
+    data: data, root: document.getElementById("main"), searchMethod: "inlineSearch",
+    subsets: true, definedRoots: roots, name: "root-tree"});
 }
 if (ENVIRONMENT === "DEV") {
   data = [
