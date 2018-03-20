@@ -6,18 +6,28 @@
 
 #scroller {
   display: inline-block;
-  font-size: .75em;
+  font-size: 12px;
   text-align: right;
   top: 5px;
   right: 5px;
 }
 
-#root {
-  display: inline-block;
-}
-
 #tree {
-  display: block;
+  display: inline-block;
+  vertical-align: top;
+  font-size: var(--font-size);
+  padding: 5px 8px 8px;
+  font-style: 900;
+  font-family: inherit;
+  letter-spacing: 1px;
+  overflow: hidden;
+  position: relative;
+  width: var(--width);
+  height: var(--height);
+  overflow-y: auto;
+  box-shadow: inset 0 0 2px #999;
+  margin: 0 5px 10px 0;
+
 }
 
 #subsets {
@@ -31,26 +41,33 @@
   margin-bottom: 5px;
 }
 
-#selection {
+#select {
   display: inline-block;
-  font-size: var(--font-size);
-  color: #333;
+}
+
+#selection {
   padding: 5px 8px 8px;
+  color: #333;
   font-style: 900;
-  font-family: inherit;
-  letter-spacing: 1px;
-  overflow: hidden;
-  position: relative;
+  font-size: var(--font-size);
   width: var(--width);
   height: var(--height);
-  overflow-y: auto;
-  display: inline-block;
-  margin: 35px 0 10px;
+  margin-bottom: 10px;
   box-shadow: inset 0 0 2px #999;
+  vertical-align: top;
+  overflow-y: auto;
 }
 
 .buttons {
   text-align: right;
+}
+
+.search-tree {
+  
+}
+
+.sel-tree-container {
+  margin-top: 5px;
 }
 
 .deselect-btn {
@@ -74,18 +91,10 @@
   background: #b2d8b2;
 }
 
-.tree #subsets {
-  font-size: 12px;
-  min-height: 25px;
-  list-style: none;
-  max-height: 100px;
-  overflow: auto;
-}
-
 .search {
-  position: relative;
   z-index: 2;
   user-select: none;
+  display: inline-block;
 }
 
 .no-results {
@@ -97,7 +106,7 @@
   position: relative;
 }
 
-#search {
+#search-input {
   display: inline-block;
   position: relative;
   font-size: 1em;
@@ -272,6 +281,10 @@ input {
   border-right: 0px;
 }
 
+.align-middle {
+  vertical-align: middle;
+}
+
 .disabled {
   background: transparent;
   border: 1px solid #969696;
@@ -280,7 +293,6 @@ input {
 }
 
 .scroll-selector {
-  padding: 3px;
   display: inline-block;
 }
 
@@ -299,18 +311,7 @@ input {
 }
 
 .tree {
-  font-size: var(--font-size);
-  padding: 5px 8px 8px;
-  font-style: 900;
-  font-family: inherit;
-  letter-spacing: 1px;
-  overflow: hidden;
-  position: relative;
-  width: var(--width);
-  height: var(--height);
-  overflow-y: auto;
-  margin: 10px 0 .25em;
-  box-shadow: inset 0 0 2px #999;
+
 }
 
 .minus .svg-inline--fa {
