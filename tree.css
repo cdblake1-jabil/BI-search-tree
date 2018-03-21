@@ -81,15 +81,13 @@
 
 .select-btn {
   display: inline-block;
-  line-height: 1.25;
-  background: #7fbf7f;
+  margin-right: 5px;
+  font-size: 10px;
   cursor: pointer;
-  padding: 5px;
+  margin-top: -5px;
+  color: #387bd8;
 }
 
-.select-btn:hover {
-  background: #b2d8b2;
-}
 
 .search {
   z-index: 2;

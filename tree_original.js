@@ -490,24 +490,31 @@ var JbTree = (function () {
         if (index < data.length) { setTimeout(doChunk, 200); }
         else {
           $scope.state.set("current-nodes", nodes);
-          _drawNodes();
+          self.drawNodes();
           $scope.state.set("nodes-loaded", true);
         }
       }
       doChunk();
       return nodes;
     };
-    var _drawNodes = function() {
+    this.drawNodes = function() {
       var curIndex = self.state.index;
       for (self.state.index; self.state.index < _config.definedRoots.length; self.state.index++) {
+        console.log(self.state.index, _config.definedRoots[self.state.index]);
         if (self.state.index == curIndex + 20) {
           _drawLoadMore();
           console.log(self.state.index);
           return;
         }
         var definedNode = _config.definedRoots[self.state.index];
-        var node = (_hasNode(definedNode.id)) ? Utilities.nodes.get(definedNode.id)
-          : new Node(definedNode.name, definedNode.id, definedNode.parents, definedNode.level, config);
+        var name = (definedNode.attributes) ? definedNode.attributes.name: definedNode.name;
+        var parents = (definedNode.attributes) ? definedNode.attributes.parents: definedNode.parents;
+        var id = (definedNode.attributes) ? definedNode.attributes.id: definedNode.id;
+        var level = (definedNode.attributes) ? definedNode.attributes.level: definedNode.level;
+
+
+        var node = (_hasNode(id)) ? Utilities.nodes.get(id)
+          : new Node(name, id, parents, level, config);
         node.draw(_config.root);
         $scope.state.get(`${_config.name}:roots`).push(node);
       }
@@ -519,16 +526,29 @@ var JbTree = (function () {
     var _drawLoadMore = function () {
       if (self.state.loadMore) return;
       var button = document.createElement("a");
-      button.addEventListener("click", _drawNodes);
+      button.addEventListener("click", self.drawNodes);
       button.classList.add("pag-button");
       button.innerHTML = "Load More";
-      _config.root.insertAdjacentElement("afterend", button);
+      document.getElementById("tree").insertAdjacentElement("beforeend", button);
       self.state.loadMore = button;
     };
 
+    this.setRootNodes = function(nodes) {
+      _config.definedRoots = nodes;
+      console.log(_config.definedRoots);
+    }
+
+    var _clearLoadMore = function() {
+      self.state.loadMore.remove();
+      self.state.loadMore = null;
+    }
+
+
     this.clear = function() {
       _config.root.innerHTML = "";
-      if(self.state.loadMore) self.state.loadMore.remove();
+      self.state.index = 0;
+      if(self.state.loadMore) _clearLoadMore();
+      console.log(_config.root.innerHTML, self.state.index);
     }
     !function onInit() {
       $scope.state.set(`${_config.name}:roots`, []);
@@ -546,7 +566,9 @@ var JbTree = (function () {
 
     return {
       clear: this.clear,
-      state: this.state
+      state: this.state,
+      drawNodes: this.drawNodes,
+      setRootNodes: this.setRootNodes
     }
   };
   var Node = function (name, id, parents, level, config) {
@@ -808,12 +830,20 @@ var JbTree = (function () {
           var _config = Object.assign({}, config);
           _config.name = self.name;
           _config.root = document.querySelector(".tree");
-          _config.searchMethod = "treeSearch";
+          console.log(self.name);
+          $scope.state.get("current-tree").clear();
+          if(self.name == "Subset All") {
+            _state.elements = $scope.state.get("initial-data");
+            _config.data = $scope.state.get("initial-data");
+            _config.definedRoots = $scope.state.get("initial-roots");
+            _config.searchMethod = "inlineSearch";
+            new Tree(_config);
+          }
           if(_state.elements.length == 0) {
             _getSubset().then(function(results){
               _config.definedRoots = results;
               _config.data = results;
-              $scope.state.get("current-tree").clear();
+              _config.searchMethod = "treeSearch";
               new Tree(_config);
             })
           }
@@ -986,12 +1016,31 @@ var JbTree = (function () {
       treeSearch: function(term) {
         var scroller = $scope.state.get("scroller");
         var results = _searchResults(Utilities.nodes.all(), term);
+        var treeRoot = document.getElementById("tree");
+        var tree = $scope.state.get("current-tree")
+        
+        self.state.searchTreeFragment.pushChild();
+        _clearSearchFragment();
+
         if(self.state.results.length == 0) {
           _noResults(document.getElementById("search-input"))
+          self.state.treeFragment.transferChild(treeRoot, "afterbegin");
+          return;
         }
 
+        console.log(results);
+        _config.treeFragment.pushChild();
+        
+        tree.clear();
+        tree.setRootNodes(results);
+        tree.drawNodes();
+
+        self.state.treeFragment.transferChild(treeRoot, "afterbegin");
       }
     };
+    var _clearSearchFragment = function() {
+      self.state.searchTreeFragment.child.innerHTML = "";
+    }
     var _noResults = function (element) {
       if (self.state.results.length == 0) { element.classList.add("no-results"); }
       else { element.classList.remove("no-results"); }
@@ -1035,6 +1084,7 @@ var JbTree = (function () {
     !function init() {
       var searchtree = document.createElement("div");
       searchtree.classList.add(".search-tree");
+      FragmentHandler.set("search-tree", searchtree, true);
       self.state.searchTreeFragment = FragmentHandler.set("search-fragment", searchtree);
       _drawInput(_config.root);
       var container = _drawSearchContainer(_config.root);
@@ -1155,14 +1205,14 @@ var JbTree = (function () {
       var selection = self.state.selections.get(id);
       if (selection && selection.drawn) self.state.drawTool.remove(id);
       if (selection) _onDeselect(Utilities.nodes.get(id));
-      _setValues();
+      // _setValues();
 
     };
     this.addSelection = function (id) {
       var selection = self.state.selections.get(id);
       var button = self.state.element.querySelector(".pag-button");
       if (!selection) {
-        self.state.selections.set(id, { element: _template(), drawn: false });
+        self.state.selections.set(id, { element: _template(), drawn: false, node: Utilities.nodes.get(id) });
         selection = self.state.selections.get(id);
         if (button) button.classList.remove("disabled");
       }
@@ -1179,7 +1229,7 @@ var JbTree = (function () {
       var display = node.attributes.name;
       var selections = $scope.state.get("selections");
       selections.set(node.attributes.id, { display: display, use: use });
-      pc.Value.add(display, use);
+      // pc.Value.add(display, use);
     };
     var _onDeselect = function (node) {
       var selections = $scope.state.get("selections");
@@ -1203,13 +1253,13 @@ var JbTree = (function () {
       if (self.state.removingValues || self.state.addingValues) return;
       self.state.removingValues = true;
       var chunk = 2000;
-      var values = Utilities.nodes.all().values();
+      var values = self.state.selections.values();
       var value = values.next();
       doChunk();
       function doChunk() {
         var cnt = chunk;
         while (cnt-- && value.value) {
-          value.value.actions.get("deselect")();
+          value.value.node.actions.get("deselect")();
           value = values.next();
         }
         if (value.value) {
@@ -1353,10 +1403,11 @@ var JbTree = (function () {
       bContainer.classList.add("buttons");
       _config.root.insertAdjacentElement("beforeend", bContainer);
       var button = document.createElement("div");
-      // button.classList.add("select-btn");
-      // button.addEventListener("click", _selectAll);
-      // button.innerHTML = "Select All";
-      // bContainer.insertAdjacentElement("beforeend", button);
+
+      button.classList.add("select-btn");
+      button.addEventListener("click", _selectAll);
+      button.innerHTML = "Select All";
+      bContainer.insertAdjacentElement("beforeend", button);
 
       button = document.createElement("div");
       button.classList.add("deselect-btn");
@@ -1422,6 +1473,9 @@ var JbTree = (function () {
         subsetsConfig.root = subsetRoot;
         new Subsets(subsetsConfig);
         subsetsLoaded();
+
+        $scope.state.set("initial-data", config.data);
+        $scope.state.set("initial-roots", config.definedRoots);
       }  else { 
         loading.transferChild(treeRoot, "afterbegin");
         setTimeout(nodesAreLoading, 500)
