@@ -4,6 +4,10 @@
   --font-size: 11px;
 }
 
+/* div {
+  position: relative;
+} */
+
 #scroller {
   display: inline-block;
   font-size: 12px;
@@ -32,13 +36,16 @@
 
 #subsets {
   border: .5px solid #e3e3e3;
+  position: relative;
   background: white;
+  font-size: var(--font-size);
   border-radius: 3px;
   line-height: 1.10;
   padding: 5px;
   width: calc(var(--width) - 25px);
   overflow: hidden;
   margin-bottom: 5px;
+  user-select: none;
 }
 
 #select {
@@ -57,6 +64,7 @@
   vertical-align: top;
   overflow-y: auto;
 }
+
 
 .buttons {
   text-align: right;
@@ -107,7 +115,8 @@
 #search-input {
   display: inline-block;
   position: relative;
-  font-size: 1em;
+  padding-left: 5px;
+  font-size: var(--font-size);
   height: 25px;
   border-top-right-radius: 1px;
   border-bottom-right-radius: 1px;
@@ -115,6 +124,9 @@
 
 #loading {
   margin: 0 5px 5px 20px;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 #counter {
@@ -318,6 +330,7 @@ input {
 
 .subset-label {
   cursor: pointer;
+  padding: 5px;
 }
 
 .subset-label:hover {
@@ -339,6 +352,7 @@ input {
   border: .5px solid #e3e3e3;
   width: calc(var(--width) - 25px);
   height: 200px;
+  font-size: var(--font-size);
   overflow: auto;
 }
 

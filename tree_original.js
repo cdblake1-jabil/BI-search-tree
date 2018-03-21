@@ -490,8 +490,12 @@ var JbTree = (function () {
         if (index < data.length) { setTimeout(doChunk, 200); }
         else {
           $scope.state.set("current-nodes", nodes);
+          // FragmentHandler.get(config.name).transferChild(tree, "beforeend");
           self.drawNodes();
           $scope.state.set("nodes-loaded", true);
+          FragmentHandler.get("current-load").pushChild();
+          FragmentHandler.get("current-fragment").transferChild(document.getElementById("tree"), "afterbegin");
+          $scope.state.set("current-nodes", nodes);
         }
       }
       doChunk();
@@ -516,8 +520,10 @@ var JbTree = (function () {
         var node = (_hasNode(id)) ? Utilities.nodes.get(id)
           : new Node(name, id, parents, level, config);
         node.draw(_config.root);
-        $scope.state.get(`${_config.name}:roots`).push(node);
+        $scope.state.get("current-tree:roots").push(node);
       }
+
+      if(self.state.index % 20 !== 0 && self.state.loadMore) self.state.loadMore.classList.add("disabled");
     }
     var _hasNode = function(id) {
       return Utilities.nodes.has(id);
@@ -551,17 +557,18 @@ var JbTree = (function () {
       console.log(_config.root.innerHTML, self.state.index);
     }
     !function onInit() {
-      $scope.state.set(`${_config.name}:roots`, []);
+      var  tree = document.getElementById("tree")
+      $scope.state.set(`current-tree:roots`, []);
       $scope.state.set("nodes-loaded", false);
       $scope.state.set("search-method", _config.searchMethod);
-      _defineFragment(_config.name, _config.root, true);
-      
       $scope.state.set("current-tree", self);
-      FragmentHandler.get(config.name).transferChild(document.getElementById("tree"), "beforeend");
+      _defineFragment("current-fragment", _config.root, true);
 
-      var nodes = _defineNodes(_config.data, config);
-      $scope.state.set("current-nodes", nodes);
-
+      new Promise(function(resolve){
+        resolve();
+      }).then(function() {
+        var nodes = _defineNodes(_config.data, config);
+      });
     }();
 
     return {
@@ -582,7 +589,8 @@ var JbTree = (function () {
     var _config = {
       data: config.data,
       root: config.root,
-      treeFragment: config.treeFragment
+      treeFragment: config.treeFragment,
+      searchChildren: config.searchChildren
     };
     this.state = {
       opened: false,
@@ -605,6 +613,8 @@ var JbTree = (function () {
       self.actions.set("deHighlight", deHighlight);
 
       function open() {
+        if(!_config.searchChildren) return;
+        var retreivingChildren = true;
         var nodeConfig = config;
         var arrow = self.state.ref.querySelector(".arrow");
         var cChild = childrenContainer();
@@ -618,6 +628,7 @@ var JbTree = (function () {
         self.state["opened"] = _toggle(self.state["opened"]);
       }
       function close() {
+        if (!_config.searchChildren) return;
         var arrow = self.state.ref.querySelector(".arrow");
         var cChild = childrenContainer();
         arrow.classList.remove("open-arrow");
@@ -657,7 +668,7 @@ var JbTree = (function () {
     };
     var children = (function () {
       this.get = function (config) {
-        var chunk = 2000;
+        var chunk = 500;
         var index = 0;
         var childContainer = self.state.ref.querySelector(".children");
         var template = document.createElement("div");
@@ -666,25 +677,7 @@ var JbTree = (function () {
         nodeConfig.root = template;
         var children;
         var loading;
-        if (self.state.children.length == 0 && !$scope.state.get("fragments").has(`${self.attributes.id}-children`)) {
-          children = FragmentHandler.set(`${self.attributes.id}-children`, template, true);
-          loading = Loading(`${self.attributes.id}-loading`);
-
-          loading.transferChild(childContainer, "beforeend");
-          setTimeout(function () {
-            new Promise(function (resolve) {
-
-              doChunk(resolve);
-            }).then(function () {
-              loading.pushChild();
-              children.transferChild(childContainer, "beforeend");
-            });
-
-          }, 0);
-
-
-          return self.state.children;
-        }
+        doChunk();
 
         function doChunk(callback) {
           var cnt = chunk;
@@ -703,8 +696,10 @@ var JbTree = (function () {
             ++index;
           }
           if (index < data.length) {
-            setTimeout(doChunk(callback), 100);
-          } else { callback(); }
+            setTimeout(doChunk(), 100);
+          } else {
+            childContainer.insertAdjacentElement("beforeend", template);
+          }
         }
       };
       return {
@@ -831,18 +826,22 @@ var JbTree = (function () {
           _config.name = self.name;
           _config.root = document.querySelector(".tree");
           console.log(self.name);
+          FragmentHandler.get("current-load").transferChild(document.getElementById("tree"), "beforeend");
           $scope.state.get("current-tree").clear();
+          $scope.state.get("scroller").reset();
           if(self.name == "Subset All") {
             _state.elements = $scope.state.get("initial-data");
             _config.data = $scope.state.get("initial-data");
             _config.definedRoots = $scope.state.get("initial-roots");
             _config.searchMethod = "inlineSearch";
+            _config.searchChildren = true;
             new Tree(_config);
           }
           if(_state.elements.length == 0) {
             _getSubset().then(function(results){
               _config.definedRoots = results;
               _config.data = results;
+              _config.searchChildren = false;
               _config.searchMethod = "treeSearch";
               new Tree(_config);
             })
@@ -895,6 +894,7 @@ var JbTree = (function () {
         })
         .then(function () { 
           $scope.state.set("subsets-loaded", true);
+          FragmentHandler.get("subset-loading").pushChild();
           console.log($scope.state.get("subsets")); 
         });
     };
@@ -915,11 +915,13 @@ var JbTree = (function () {
     !function onInit() {
       $scope.state.set("subsets", new Map());
       var subsets = _template();
+      var loading = Loading("subset-loading");
       var dropdown = _dropdownContainer();
       _state.element = subsets;
       _config.root.insertAdjacentElement("afterbegin", subsets);
       _state.element.insertAdjacentElement("afterend", dropdown);
-      _getSubsets(dropdown);
+      loading.transferChild(document.getElementById("subsets"), "afterbegin");
+      setTimeout(function(){ _getSubsets(dropdown);}, 0);
 
       subsets.addEventListener("click", function (e) {
         e.stopPropagation();
@@ -980,7 +982,7 @@ var JbTree = (function () {
     };
 
     var _closeRoots = function () {
-      var roots = $scope.state.get(`${_config.name}:roots`);
+      var roots = $scope.state.get("current-tree:roots");
       for (var i = 0; i < roots.length; i++) {
         roots[i].actions.get("close")();
       }
@@ -993,20 +995,30 @@ var JbTree = (function () {
           _deHighlightAll();
           _closeRoots();
           scroller.reset();
-          if (!_validTerm(term)) return;
-          if ($scope.state.get("nodes-loaded")) {
+          _clearSearchFragment();
+          if (!_validTerm(term)) {
+            return;
+          }
+          FragmentHandler.get("current-fragment").pushChild();
+          FragmentHandler.get("current-load").transferChild(document.getElementById("tree"), "beforeend");
+          setTimeout(function(){ 
+            if ($scope.state.get("nodes-loaded")) {
             var results = _searchResults(Utilities.nodes.all(), term);
+            if (results.length == 0) _noResults();
             for (let i = 0; i < results.length; i++) {
               var parents = _getParents(results[i]);
               _displayChildren(parents);
               results[i].actions.get("highlight")();
             }
+            FragmentHandler.get("current-fragment").transferChild(document.getElementById("tree"), "afterbegin");
+            FragmentHandler.get("current-load").pushChild();
             resolve();
           } else {
             setTimeout(function () {
               searchMethod["inlineSearch"](term);
             }, 300);
           }
+        },0);
         })
           .then(function () {
             scroller.next();
@@ -1018,12 +1030,13 @@ var JbTree = (function () {
         var results = _searchResults(Utilities.nodes.all(), term);
         var treeRoot = document.getElementById("tree");
         var tree = $scope.state.get("current-tree")
+
         
         self.state.searchTreeFragment.pushChild();
         _clearSearchFragment();
 
         if(self.state.results.length == 0) {
-          _noResults(document.getElementById("search-input"))
+          _noResults()
           self.state.treeFragment.transferChild(treeRoot, "afterbegin");
           return;
         }
@@ -1040,10 +1053,11 @@ var JbTree = (function () {
     };
     var _clearSearchFragment = function() {
       self.state.searchTreeFragment.child.innerHTML = "";
+      document.getElementById("search-input").classList.remove("no-results");
     }
     var _noResults = function (element) {
-      if (self.state.results.length == 0) { element.classList.add("no-results"); }
-      else { element.classList.remove("no-results"); }
+      if (self.state.results.length == 0) { document.getElementById("search-input").classList.add("no-results"); }
+      else { document.getElementById("search-input").classList.remove("no-results"); }
     };
     var displayResults = function() {
 
@@ -1095,13 +1109,11 @@ var JbTree = (function () {
       _config.root = container;
       button.addEventListener("click", function (e) {
         searchMethod[$scope.state.get("search-method")](search.value);
-        _noResults(e.target);
       });
       // search.addEventListener("keypress", function (e) {
       //   var key = e.which || e.keycode;
       //   if (key === 13) {
       //     searchMethod[_config.searchMethod](search.value);
-      //     _noResults(e.target);
       //   }
       // });
     }();
@@ -1205,7 +1217,7 @@ var JbTree = (function () {
       var selection = self.state.selections.get(id);
       if (selection && selection.drawn) self.state.drawTool.remove(id);
       if (selection) _onDeselect(Utilities.nodes.get(id));
-      // _setValues();
+      if(!self.state.removingValues) _setValues();
 
     };
     this.addSelection = function (id) {
@@ -1424,7 +1436,6 @@ var JbTree = (function () {
   };
   this.state = new State();
   this.init = function (config) {
-    
     var loading = Loading("current-load");
     var selectionTreeContainer = document.createElement("div");
     selectionTreeContainer.classList.add("sel-tree-container");
@@ -1443,17 +1454,19 @@ var JbTree = (function () {
     selectionTreeContainer.insertAdjacentElement("beforeend", treeRoot);
     var treeConfig = Object.assign({}, config);
     treeConfig.root = treeRoot.querySelector(".tree");
+    treeConfig.searchChildren = true;
+    loading.transferChild(treeRoot, "beforeend");
+
     var tree = new Tree(treeConfig);
 
     nodesAreLoading();
 
     function nodesAreLoading() {
       if($scope.state.get("nodes-loaded")) {
-        loading.pushChild() 
 
         config.root.insertAdjacentElement("afterbegin", searchRoot);
         var searchConfig = Object.assign({}, config);
-        searchConfig.treeFragment = FragmentHandler.get(config.name);
+        searchConfig.treeFragment = FragmentHandler.get("current-fragment");
         searchConfig.root = searchRoot;
         new Search(searchConfig);
 
@@ -1477,7 +1490,6 @@ var JbTree = (function () {
         $scope.state.set("initial-data", config.data);
         $scope.state.set("initial-roots", config.definedRoots);
       }  else { 
-        loading.transferChild(treeRoot, "afterbegin");
         setTimeout(nodesAreLoading, 500)
       }
     };
