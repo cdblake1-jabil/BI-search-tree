@@ -3,8 +3,8 @@ var data = [];
 var roots = [];
 var dimension = "Profit Center";
 // var server = "https://training.myanalytics.jabil.com/api/v1/";
-var server = "http://corrdcctmdev10.corp.jabil.org:8000/api/v1/";
-// var server = "http://CORRDCCTMSTG10.corp.jabil.org:8000/api/v1/";
+// var server = "http://corrdcctmdev10.corp.jabil.org:8000/api/v1/";
+var server = "http://CORRDCCTMSTG10.corp.jabil.org:8000/api/v1/";
 
 (function (k) { if ("function" === typeof define && define.amd) define(k); else if ("object" === typeof exports) module.exports = k(); else { var g = window.Cookies, c = window.Cookies = k(); c.noConflict = function () { window.Cookies = g; return c; }; } })(function () {
   function k() { for (var c = 0, b = {}; c < arguments.length; c++) { var a = arguments[c], f; for (f in a) b[f] = a[f]; } return b; } function g(c) {
@@ -901,7 +901,10 @@ var JbTree = (function () {
     var _template = function () {
       var template = document.createElement("div");
       template.id = "subsets";
-      template.innerHTML = "<div class=\"subset-title\"></div><div class=\"subset-btn\"><i class=\"align-middle fas fa-sort-down\"></i></div>";
+      template.innerHTML = `
+        <div class=\"subset-title\"></div>
+        <i class=\"align-middle fas fa-caret-down\"></i>
+          `;
       return template;
     };
     var _dropdownContainer = function () {
@@ -919,7 +922,7 @@ var JbTree = (function () {
       var dropdown = _dropdownContainer();
       _state.element = subsets;
       _config.root.insertAdjacentElement("afterbegin", subsets);
-      _state.element.insertAdjacentElement("afterend", dropdown);
+      _state.element.insertAdjacentElement("beforeend", dropdown);
       loading.transferChild(document.getElementById("subsets"), "afterbegin");
       setTimeout(function(){ _getSubsets(dropdown);}, 0);
 
@@ -950,7 +953,8 @@ var JbTree = (function () {
     this.state = {
       searchTreeFragment: null,
       treeFragment: config.treeFragment,
-      results: []
+      results: [],
+      index: 0
     };
     var _validTerm = function (term) {
       return !(term == "" || term == undefined || term == null);
@@ -988,6 +992,17 @@ var JbTree = (function () {
       }
     };
 
+    this.drawResults = function() {
+      var curIndex = self.state.index;
+
+      for(let i = self.state.index; i < self.state.results.length; i++) {
+        if(self.state.index == curIndex +  50) return;
+        var parents = _getParents(results[i])
+        _displayChildren(parents);
+        self.state.results[i].actions.get("highlight")();
+      }
+    }
+
     var searchMethod = {
       inlineSearch: function (term) {
         var scroller = $scope.state.get("scroller");
@@ -995,6 +1010,7 @@ var JbTree = (function () {
           _deHighlightAll();
           _closeRoots();
           scroller.reset();
+          _self.state.index = 0;
           _clearSearchFragment();
           if (!_validTerm(term)) {
             return;
@@ -1003,13 +1019,9 @@ var JbTree = (function () {
           FragmentHandler.get("current-load").transferChild(document.getElementById("tree"), "beforeend");
           setTimeout(function(){ 
             if ($scope.state.get("nodes-loaded")) {
-            var results = _searchResults(Utilities.nodes.all(), term);
+            self.state.results = _searchResults(Utilities.nodes.all(), term);
             if (results.length == 0) _noResults();
-            for (let i = 0; i < results.length; i++) {
-              var parents = _getParents(results[i]);
-              _displayChildren(parents);
-              results[i].actions.get("highlight")();
-            }
+            self.drawResults();
             FragmentHandler.get("current-fragment").transferChild(document.getElementById("tree"), "afterbegin");
             FragmentHandler.get("current-load").pushChild();
             resolve();
@@ -1056,12 +1068,12 @@ var JbTree = (function () {
       document.getElementById("search-input").classList.remove("no-results");
     }
     var _noResults = function (element) {
-      if (self.state.results.length == 0) { document.getElementById("search-input").classList.add("no-results"); }
-      else { document.getElementById("search-input").classList.remove("no-results"); }
+      if (self.state.results.length == 0) { 
+        document.getElementById("search-input").classList.add("no-results"); 
+        $scope.state.get("scroller").noResults();
+      }
     };
-    var displayResults = function() {
 
-    };
     var _searchResults = function (map, term) {
       var results = [];
       var values = map.values();
@@ -1072,7 +1084,6 @@ var JbTree = (function () {
         }
         value = values.next();
       }
-      self.state.results = results;
       return results;
     };
 
@@ -1169,6 +1180,10 @@ var JbTree = (function () {
       _components.counter.innerHTML = "";
     };
 
+    this.noResults = function () {
+      _components.counter.innerHTML = "0/0";
+    }
+
     !function onInit(root) {
 
       var template = document.createElement("div");
@@ -1191,6 +1206,7 @@ var JbTree = (function () {
 
     return {
       reset: this.reset,
+      noResults: this.noResults,
       state: this.state,
       next: _scrollForward,
       back: _scrollBack
@@ -1434,13 +1450,49 @@ var JbTree = (function () {
       addSelection: this.addSelection
     };
   };
+
+  var Toolbar = function(root) {
+    var _state = {
+      ref: null,
+      sections: []
+    }  
+
+    var _template = function() {
+      var template = document.createElement("div");
+      template.id = "toolbar";
+
+      return template;
+    }
+
+    this.addSection = function(name, element) {
+      var section = document.createElement("div");
+      section.classList.add("toolbar-section");
+      section.insertAdjacentElement("beforeend", element);
+
+      _state.ref.insertAdjacentElement("beforeend", section);
+      _state.sections.push({name: name, ref: section});
+    }
+
+    !function onInit(){
+      var toolbar = _template();
+      _state.ref = toolbar;
+      root.insertAdjacentElement("afterbegin", toolbar);
+    }()
+
+    return {
+      addSection: this.addSection
+    }
+  }
   this.state = new State();
   this.init = function (config) {
     var loading = Loading("current-load");
     var selectionTreeContainer = document.createElement("div");
     selectionTreeContainer.classList.add("sel-tree-container");
-    config.root.insertAdjacentElement("afterbegin", selectionTreeContainer);
+    config.root.insertAdjacentElement("beforeend", selectionTreeContainer);
 
+    var toolbar = new Toolbar(config.root);
+    
+    
     var treeRoot = document.createElement("div");
     treeRoot.id = "tree";
     treeRoot.innerHTML = "<div class=\"tree\"></div>";
@@ -1451,6 +1503,14 @@ var JbTree = (function () {
     var subsetRoot = document.createElement("div");
     subsetRoot.id = "subset";
 
+    var title = document.createElement("div");
+    title.innerHTML = `${dimension}`;
+    toolbar.addSection("title", title)
+    toolbar.addSection("subsets", subsetRoot);
+    toolbar.addSection("search", searchRoot);
+
+    
+    
     selectionTreeContainer.insertAdjacentElement("beforeend", treeRoot);
     var treeConfig = Object.assign({}, config);
     treeConfig.root = treeRoot.querySelector(".tree");
@@ -1464,7 +1524,7 @@ var JbTree = (function () {
     function nodesAreLoading() {
       if($scope.state.get("nodes-loaded")) {
 
-        config.root.insertAdjacentElement("afterbegin", searchRoot);
+        // config.root.insertAdjacentElement("afterbegin", searchRoot);
         var searchConfig = Object.assign({}, config);
         searchConfig.treeFragment = FragmentHandler.get("current-fragment");
         searchConfig.root = searchRoot;
@@ -1481,7 +1541,7 @@ var JbTree = (function () {
         selectionConfig.root = selectRoot;
         new Selection(selectionConfig);
 
-        config.root.insertAdjacentElement("afterbegin", subsetRoot);
+        // config.root.insertAdjacentElement("afterbegin", subsetRoot);
         var subsetsConfig = Object.assign({}, config);
         subsetsConfig.root = subsetRoot;
         new Subsets(subsetsConfig);
